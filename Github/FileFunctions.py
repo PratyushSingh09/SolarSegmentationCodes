@@ -1,5 +1,7 @@
 import os
 import pandas as pd
+import shutil
+
 def absoluteFilePaths(directory):
     
     '''Obtain a 'generator' for each file within the given directory. Used by ret_files_in_dir function
@@ -56,3 +58,26 @@ def get_paths(rootdir,suf='.image.fits'):
     img_list335 = [rootdir+"/"+file for file in file_list if file.endswith('335'+suf)]
 
     return pd.DataFrame((img_list94,img_list131,img_list171,img_list193,img_list211,img_list335)).T
+
+"""________________UNEDITED FUNCTIONS_________________________"""
+
+def get_files_with_suffix(directory,suf='None'):
+    '''For a given directory, finds all files which end with a given suffix and sends them in a sorted list
+    
+    directory: the directory to get the image paths from
+    suf: The suffix 
+    '''
+    file_list = os.listdir(directory)
+    img_list1 = [file for file in file_list if file.endswith(suf)]
+
+    files = [directory+"\\"+file for file in img_list1]
+    files.sort()
+def copy_files(files, new_dir):
+    '''Copy several files to a new directory. Uses the shutil.copy2 function
+    
+    files: List of files to be copied
+    new_dir: The directory where to copy files
+
+    '''
+    for file in files:
+        shutil.copy2(file,new_dir)

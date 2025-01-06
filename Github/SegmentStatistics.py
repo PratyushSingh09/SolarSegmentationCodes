@@ -4,6 +4,15 @@ from ImageTransform import EM_normalize
 import mode
 import hipd_interval
 
+import sunpy
+from astropy.io import fits
+from aiapy.calibrate import normalize_exposure
+
+from datetime import datetime
+
+import seaborn as sns   
+import matplotlib.pyplot as plt
+
 def get_boundaries_for_cluster(data,lab):
     '''For a given segment value, define the boundaries of that segment
         data: the segmented image
@@ -215,3 +224,265 @@ def clus_stats_hpd(im_data,k_data,log_scale=False,hdip=None,em_norm=0,aia_data=N
         if aia_tr is not None:
             aia_av_list.append(aiaav)
     return a_list,a_mean_list,a_std_list,a_err_list,a_coord_list,aia_dat_list,a_len_list,aia_av_list
+
+'''__________________UNEDITED FUNCTIONS_________________________'''
+
+def segment_to_mean(aia_image_data:np.ndarray,km_image_data:np.ndarray,use_sunpy=False,location=None,maparr=None,j=None,norm=None):
+    '''Replace segment label in each segment with its representative mean value
+    
+    aia_image_data: AIA Image at a particular wavelength
+    km_image_data: Segmented image 
+    location: Save location for this new image
+    maparr: Array of all AIA image maps (I think, check). Used for fits headers although probably not required and could be implemented better
+    j: Index of relevant wavelength from the array: [94,131,171,193,211,335]
+    norm: If set: normalizes image with exposure time
+
+    Returns: The image created by the function
+    '''
+    #np empty corrupts array data
+    tarr=np.zeros(km_image_data.shape,dtype=np.float64)
+    mean_img=np.array(aia_image_data,dtype=np.float64)
+    for i in range(int(max(km_image_data.flatten()))+1):
+        img_mask = mean_img[km_image_data==i]
+        mean = np.nanmean(img_mask)
+        # mean = modalpoint(img_mask)
+        stddev = np.std(img_mask)
+        # mean_img2 = np.ma.array(mean_img,mask=km_image_data==i,dtype=np.float64)
+        # mean_img = mean_img2.filled(fill_value=np.float64(mean))
+        # tarr = [mean if c else yv for c, yv in zip(km_image_data.flatten()==i,tarr)]
+        # tarr=np.where(km_image_data==i,np.random.normal(mean,stddev,(400,400)),tarr)
+        # tarr=np.where(km_image_data==i,mean,tarr)
+        tarr[km_image_data==i]=mean
+
+    if use_sunpy:
+        x=sunpy.map.ap((tarr),maparr[j].fits_header)
+        print(x.data.max())
+        if location is not None:
+            x.save(location,overwrite=True)
+        if norm:
+            print('Normalizing')
+            x=normalize_exposure(x)
+        return x.data        
+    else:
+        x = fits.PrimaryHDU(tarr)
+        if location is not None:
+            x.writeto(location,overwrite=True)
+        if norm:
+            print('Normalize exposure of DEM? Not sure what you\'re trying to do')
+            return None
+        return x.data
+        
+
+def segment_files_to_mean(imgs,segfiles,wavelength,maparr,crop = None,norm = False):
+    '''Iterates through a list of AIA and segmented images at same epochs and for each set of images, replaces segment label in each segment with its representative mean value
+
+    imgs: Pandas table of AIA images. Each row correspond to different epochs and each column correspond to one of 6 wavelengths. Can be created by the get_paths function in FileFunctions.py
+    segfiles: List of segmented image paths to be used
+    wavelength: AIA Wavelength for which the images must be created
+    maparr: Array of all AIA image maps (I think, check). Used for fits headers although probably not required and could be implemented better
+    crop: Crop the given set of images. Is a tuple of (bottom left coordinate, top right coordinate)
+    norm: If set: normalizes image with exposure time
+      
+    '''
+    files=segfiles
+    if wavelength==94:
+        wavelength_index=0
+    elif wavelength==131:
+        wavelength_index=1
+    elif wavelength==171:
+        wavelength_index=2
+    elif wavelength==193:
+        wavelength_index=3
+    elif wavelength==211:
+        wavelength_index=4
+    elif wavelength==335:
+        wavelength_index=5
+
+    mean_arr=[]
+    mean_img_arr=[]
+    mskarr = sunpy.map.Map(imgs.to_numpy()[:,wavelength_index].tolist()[::5],sequence=True)
+    files.sort()
+    for i in range(len(files)):
+        print(i)
+        # mask_image=fits.open(imgs.iloc[i].values.flatten().tolist()[wavelength_index])
+        mask_image = mskarr[i]
+        if crop is not None:
+            mask_image=mask_image.submap(crop[0], top_right=crop[1])
+        # mask_image_data = mask_image.data
+
+        seg_image = fits.open(files[i])
+        seg_image_data = seg_image[0].data
+
+        mean_img=segment_to_mean(mskarr[i].data,seg_image[0].data,files[i][0:-5]+'M'+str(wavelength)+'.fits',maparr,i,norm=norm)
+        mean_img_arr.append(mean_img)
+        mean_arr.append(np.max(mean_img))
+    print(np.max(np.array(mean_arr)))
+    return mean_img_arr
+        # save_image(mean_img,files[i][0:-5]+'M211.fits')
+def avg_segment_file_to_mean(imgs,avg_file,wavelength,maparr,crop = None):
+    '''NOT USED   Iterates through a list of AIA images and for each image, replaces segment label in each segment with its representative mean value. It uses a single segmentation (like mean segmentation) for AIA images at each epoch
+
+    imgs: Pandas table of AIA images. Each row correspond to different epochs and each column correspond to one of 6 wavelengths. Can be created by the get_paths function in FileFunctions.py
+    avg_file: Segmented image paths to be used
+    wavelength: AIA Wavelength for which the images must be created
+    maparr: Array of all AIA image maps (I think, check). Used for fits headers although probably not required and could be implemented better
+    crop: Crop the given set of images. Is a tuple of (bottom left coordinate, top right coordinate)
+    norm: If set: normalizes image with exposure time
+      
+    '''
+
+    if wavelength==94:
+        wavelength_index=0
+    elif wavelength==131:
+        wavelength_index=1
+    elif wavelength==171:
+        wavelength_index=2
+    elif wavelength==193:
+        wavelength_index=3
+    elif wavelength==211:
+        wavelength_index=4
+    elif wavelength==335:
+        wavelength_index=5
+
+    mean_arr=[]
+    mean_img_arr=[]
+    seg_image = fits.open(avg_file)
+    seg_image_data = seg_image[0].data
+
+    for i in range(len(imgs)):
+        print(i)
+        # mask_image=fits.open(imgs.iloc[i].values.flatten().tolist()[wavelength_index])
+        mask_image = sunpy.map.Map(imgs.iloc[i].values.flatten().tolist()[wavelength_index])
+        if crop is not None:
+            mask_image=mask_image.submap(crop[0], top_right=crop[1])
+        # mask_image_data = mask_image.data
+
+
+        tm=mask_image.fits_header['T_REC']
+
+        datetime_object = datetime.strptime(tm, '%Y-%m-%dT%H:%M:%S.%f')
+        # time = str(datetime_object.hour) +str (datetime_object.minute)+str(datetime_object.second)
+        time = '{:02d}'.format(datetime_object.hour)+'{:02d}'.format(datetime_object.minute)+'{:02d}'.format(datetime_object.second)
+
+
+        mean_img=segment_to_mean(mask_image.data,seg_image_data,avg_file[0:-5]+time+'M'+str(wavelength)+'.fits',maparr,i)
+        mean_img_arr.append(mean_img)
+        mean_arr.append(np.max(mean_img))
+    print(np.max(np.array(mean_arr)))
+    return mean_img_arr
+
+
+def segment_to_std(aia_image_data:np.ndarray,km_image_data:np.ndarray,location):
+    '''Obtains and saves standard deviation value of all pixels in each segment in the given segmented image
+    
+    aia_image_data: AIA Image at a particular wavelength
+    km_image_data: Segmented image 
+    location: Save location for this new image
+
+    Returns: The image created by the function
+    '''
+    #np empty corrupts array data
+    tarr=np.zeros(km_image_data.shape)
+    mean_img=np.array(aia_image_data,dtype=np.float64)
+    # plt.imshow(mean_img)
+    # plt.show()
+    sucessful = False
+
+    std_arr=[]
+    # while not sucessful:
+    for i in range(int(max(km_image_data.flatten()))+1):
+        # success=False
+        # while not success:
+        img_mask = aia_image_data[km_image_data==i]
+        stdval = np.nanstd(img_mask)
+        std_arr.append(stdval)
+
+    np.savetxt(location,np.array(std_arr))
+    return std_arr
+def std_segment_file_to_mean(imgs,avg_file,wavelength_index,wavelength,crop = None):
+    '''NOT USED PERHAPS MAKE A REGULAR VERION OF THIS FUNCTION Iterates through a list of AIA images and for each image, obtains standard deviation value of all pixels in each segment in the given segmented image. It uses a single segmentation (like mean segmentation) for AIA images at each epoch
+
+    imgs: Pandas table of AIA images. Each row correspond to different epochs and each column correspond to one of 6 wavelengths. Can be created by the get_paths function in FileFunctions.py
+    avg_file: Segmented image paths to be used
+    wavelength: AIA Wavelength for which the images must be created
+    crop: Crop the given set of images. Is a tuple of (bottom left coordinate, top right coordinate)
+      
+    '''
+    mean_arr=[]
+    mean_img_arr=[]
+
+    for i in range(len(imgs)):
+        print(i)
+        # mask_image=fits.open(imgs.iloc[i].values.flatten().tolist()[wavelength_index])
+        mask_image = sunpy.map.Map(imgs.iloc[i].values.flatten().tolist()[wavelength_index])
+        if crop is not None:
+            mask_image=mask_image.submap(crop[0], top_right=crop[1])
+        # mask_image_data = mask_image.data
+
+        seg_image = fits.open(avg_file)
+        seg_image_data = seg_image[0].data
+
+        tm=mask_image.fits_header['T_REC']
+
+        datetime_object = datetime.strptime(tm, '%Y-%m-%dT%H:%M:%S.%f')
+        # time = str(datetime_object.hour) +str (datetime_object.minute)+str(datetime_object.second)
+        time = '{:02d}'.format(datetime_object.hour)+'{:02d}'.format(datetime_object.minute)+'{:02d}'.format(datetime_object.second)
+
+
+        mean_img=segment_to_std(mask_image.data,seg_image_data,avg_file[0:-5]+time+'STD'+str(wavelength)+'.txt')
+        mean_img_arr.append(mean_img)
+        mean_arr.append(np.max(mean_img))
+    print(np.max(np.array(mean_arr)))
+    return mean_img_arr
+def save_array_as_fits(image,location):
+    '''Save a 2D numpy array as a fits image
+    
+    image: 2D array to be saved
+    location: save location
+    '''
+    hdu = fits.PrimaryHDU(image)
+    hdu.writeto(location,overwrite=True)
+        # save_image(mean_img,files[i][0:-5]+'M211.fits')
+
+def DEM_Seg_chisq(clus_eval_out=None,am=None,bm=None,ash=None,bsh=None):
+    if clus_eval_out:
+        assert (am==None and bm==None and ash==None and bsh==None), 'Supplied more arguments than required'
+        am=np.array(clus_eval_out[2])
+        bm=np.array(clus_eval_out[3])
+        ash=np.array(clus_eval_out[4])/2
+        bsh=np.array(clus_eval_out[5])/2
+    elif (am and bm and ash and bsh):
+        assert clus_eval_out==None, 'Supplied more arguments than required'
+    else:
+        assert 0,'Insufficient Arguments'
+    chipairs=np.nansum(((am-bm)**2/(ash**2+bsh**2)),axis=1,where=np.isinf((am-bm)**2/(ash**2+bsh**2))==False)
+    return chipairs
+
+def plot_chisq(chipairs):
+    plt.plot((chipairs))
+    plt.xlabel('Index')
+    plt.ylabel('Chi Square Differences')
+    plt.axhline((21*1.3), color='black')#sqrt(2)*20
+    plt.show()
+
+def plot_chisq_distr(chipairs,title='Distribution for Chi Square Differences',csq_list_list=None):
+    d=0
+    def forward(x):
+        return x**(1/2)
+
+
+    def inverse(x):
+        return x**2
+    if csq_list_list is not None:
+        for c in csq_list_list[:-1]:
+            print(d)
+            d+=1
+            ax=sns.kdeplot(c)
+        ax=sns.kdeplot(csq_list_list[-1])
+
+    ax=sns.kdeplot(chipairs)
+    ax.set_yscale('function', functions=(forward, inverse))
+    plt.xlabel('Chi Square Differences')
+    # plt.legend(['Actual DEMs','Simulated DEMs'],reverse=True)
+    plt.title(title)
+    # plt.legend(['Simulated','Actual '])
