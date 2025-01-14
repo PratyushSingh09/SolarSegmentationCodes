@@ -79,7 +79,7 @@ def transform_save(files,save_loc,beta=1,gamma=0,sigma=2,med_pixels=None,fits_in
     sigma: Standard deviation of Gaussian filter to be applied before segmentation.
     med_pixels: 
     fits_index: Index of the hdu where the fits image data is stored. This is 1 for images obtained from JSOC. Images I created from other methods had this as 0
-    Returns:Transformed features as used by the segmentation algorithm
+
     """
     for i, ro in files.iterrows():
         fits_arrays = [fits.open(fits_file) for fits_file in ro]
