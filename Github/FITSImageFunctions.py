@@ -1,10 +1,10 @@
-'''COMPLETELY UNEDITED'''
 
 import os
 import sunpy
 from sunpy.map import Map
 from astropy.io import fits
 from aiapy.calibrate import normalize_exposure
+from astropy.table import Table
 
 from datetime import datetime
 import numpy as np
@@ -12,6 +12,18 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+def pandas_to_Table(df_arr,tablepaths,overwrite=False):
+    '''Save several dataframes as astropy tables. Very simple function I know
+        df_arr: List of dataframes to be saved
+        tablepaths: List of paths where fits tables will be saved to
+        overwrite: Overwrite existing saved fits tables'''
+    for (df,tablepath) in zip(df_arr,tablepaths):
+        
+        t = Table.from_pandas(df)
+        t.write(tablepath,format='fits',overwrite = overwrite)
+
+
+'''COMPLETELY UNEDITED'''
 from ImageTransform import transform
 
 def get_maps_for_pair_sunpy(rootdir:str,f1,f2,suf='.image.fits'):
