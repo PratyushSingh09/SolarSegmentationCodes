@@ -58,7 +58,7 @@ def get_paths(rootdir,suf='.image.fits'):
     img_list335 = [rootdir+"/"+file for file in file_list if file.endswith('335'+suf)]
 
     return pd.DataFrame((img_list94,img_list131,img_list171,img_list193,img_list211,img_list335)).T
-def get_files_with_suffix(directory,suf='None'):
+def get_files_with_suffix(directory,suf=None):
     '''For a given directory, finds all files which end with a given suffix and sends them in a sorted list
     
     directory: the directory to get the image paths from
