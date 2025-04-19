@@ -72,8 +72,6 @@ def get_files_with_suffix(directory,suf='None'):
     files.sort()
     return files
 
-"""________________UNEDITED FUNCTIONS_________________________"""
-
 def copy_files(files, new_dir):
     '''Copy several files to a new directory. Uses the shutil.copy2 function
     
@@ -83,3 +81,4 @@ def copy_files(files, new_dir):
     '''
     for file in files:
         shutil.copy2(file,new_dir)
+
