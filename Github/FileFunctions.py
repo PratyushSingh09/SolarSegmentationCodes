@@ -58,12 +58,11 @@ def get_paths(rootdir,suf='.image.fits'):
     img_list335 = [rootdir+"/"+file for file in file_list if file.endswith('335'+suf)]
 
     return pd.DataFrame((img_list94,img_list131,img_list171,img_list193,img_list211,img_list335)).T
-def get_files_with_suffix(directory,suf=None):
+def get_files_with_suffix(directory,suf=''):
     '''For a given directory, finds all files which end with a given suffix and sends them in a sorted list
     
     directory: the directory to get the image paths from
     suf: The suffix 
-    returns the sorted list
     '''
     file_list = os.listdir(directory)
     img_list1 = [file for file in file_list if file.endswith(suf)]
@@ -72,6 +71,19 @@ def get_files_with_suffix(directory,suf=None):
     files.sort()
     return files
 
+def get_files_with_prefix_suffix(directory,pre='',suf=''):
+    '''For a given directory, finds all files which start with a given prefix and/or end with a given suffix and sends them in a sorted list
+    
+    directory: the directory to get the image paths from
+    pre: The prefix
+    suf: The suffix 
+    '''
+    file_list = os.listdir(directory)
+    img_list1 = [file for file in file_list if (file.endswith(suf) and file.startswith(pre))]
+
+    files = [directory+"\\"+file for file in img_list1]
+    files.sort()
+    return files
 def copy_files(files, new_dir):
     '''Copy several files to a new directory. Uses the shutil.copy2 function
     
